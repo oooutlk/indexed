@@ -1,0 +1,16 @@
+[package]
+name = "indexed"
+version = "0.1.0"
+authors = ["oooutlk <oooutlk@outlook.com>"]
+license = "MIT"
+keywords = [ "pool", "index", "pin", "vec", "allocator" ]
+readme = "README.md"
+repository = "https://github.com/oooutlk/indexed"
+documentation = "https://docs.rs/indexed"
+categories = [ "memory-management", "data-structures", "no-std" ]
+description = "Convenient allocator for index-linked data structures"
+
+[dependencies]
+
+[features]
+no_std = []
