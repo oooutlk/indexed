@@ -83,6 +83,7 @@
 #[cfg(not(feature="no_std"))] pub(crate) use std::marker::PhantomData;
 #[cfg(not(feature="no_std"))] pub(crate) use std::mem::{self,transmute};
 #[cfg(not(feature="no_std"))] pub(crate) use std::ops;
+#[cfg(not(feature="no_std"))] pub(crate) use std::pin::Pin;
 #[cfg(not(feature="no_std"))] pub(crate) use std::ptr::{self,NonNull,drop_in_place};
 
 #[cfg(feature="no_std")] extern crate alloc;
@@ -92,6 +93,7 @@
 #[cfg(feature="no_std")] pub(crate) use core::marker::PhantomData;
 #[cfg(feature="no_std")] pub(crate) use core::mem::{self,transmute};
 #[cfg(feature="no_std")] pub(crate) use core::ops;
+#[cfg(feature="no_std")] pub(crate) use core::pin::Pin;
 #[cfg(feature="no_std")] pub(crate) use core::ptr::{self,NonNull,drop_in_place};
 
 /// Possible chunk sizes.
@@ -699,16 +701,18 @@ impl<T:Indexed> Drop for Pool<T> {
     fn drop( &mut self ) {
         let len = self.chunks.len();
         if self.managed && len > 0 {
-            unsafe{ self.chunks.set_len( 0 ); }
             for i in 0..len-1 {
+                let chunk = unsafe{ self.chunks.get_unchecked_mut(i) };
+                unsafe{ chunk.0.set_len( 0 ); }
                 for j in 0..chunk_len::<T>() {
-                    unsafe{ drop_in_place( &mut self.chunks.get_unchecked_mut(i)[j] ); }
+                    unsafe{ drop_in_place( &mut chunk[j] ); }
                 }
             }
             unsafe {
-                let last = self.chunks.get_unchecked_mut( len-1 );
+                let last_chunk = self.chunks.get_unchecked_mut( len-1 );
                 for j in 0..=self.subidx {
-                    drop_in_place( &mut last[ j ]);
+                    last_chunk.0.set_len( 0 );
+                    drop_in_place( &mut last_chunk[ j ]);
                 }
             }
         }
