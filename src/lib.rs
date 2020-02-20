@@ -11,9 +11,10 @@
 //! ```
 //! use indexed::{Indexed,Pool};
 //! use std::fmt::{self,Display,Formatter};
+//! use std::pin::Pin;
 //!
 //! // A singly linked list of string.
-//! struct List( Box<Pool<Node>> );
+//! struct List( Pin<Box<Pool<Node>>> );
 //!
 //! struct Node {
 //!     next  : u32,
@@ -247,7 +248,7 @@ impl<T:Indexed> Pool<T> {
     ///
     /// assert_eq!( unsafe{ COUNT }, 3 );
     /// ```
-    pub fn new() -> Box<Self> { Self::new_pool( true )}
+    pub fn new() -> Pin<Box<Self>> { Self::new_pool( true )}
 
     /// Creates a new pool that does not drop its elements on destruction.
     /// It is up to the user to drop the elements manually to avoid memory leaks.
@@ -284,9 +285,9 @@ impl<T:Indexed> Pool<T> {
     /// }
     /// assert_eq!( unsafe{ COUNT }, 0 );
     /// ```
-    pub fn new_unmanaged() -> Box<Self> { Self::new_pool( false )}
+    pub fn new_unmanaged() -> Pin<Box<Self>> { Self::new_pool( false )}
 
-    fn new_pool( managed: bool ) -> Box<Self> {
+    fn new_pool( managed: bool ) -> Pin<Box<Self>> {
         if mem::size_of::<T>() == 0 {
             panic!( "ZSTs are not allowed to be the `Pool`'s element type." );
         } else {
@@ -303,7 +304,7 @@ impl<T:Indexed> Pool<T> {
                 let ppool = NonNull::new_unchecked( pool );
                 let mut pool = Box::from_raw( pool );
                 pool.ppool = ppool;
-                pool
+                Pin::new_unchecked( pool )
             }
         }
     }
@@ -534,13 +535,14 @@ impl<T:Indexed> Pool<T> {
     /// ```
     /// #[macro_use] extern crate indexed;
     /// use indexed::{Indexed,Pool};
+    /// use std::pin::Pin;
     ///
     /// extrusive_indexed!{ Foo{ inner: i32 }}
     ///
     /// let mut pool = Pool::<Foo>::new();
     /// let p = pool.non_null();
     ///
-    /// assert_eq!( p, std::ptr::NonNull::new( Box::into_raw( pool )).unwrap() );
+    /// assert_eq!( p, std::ptr::NonNull::new( Box::into_raw( Pin::into_inner( pool ))).unwrap() );
     /// ```
     pub fn non_null( &self ) -> NonNull<Self> { self.ppool }
 
@@ -677,12 +679,12 @@ impl<T:Indexed> Pool<T> {
     }
 
     /// Returns a shared reference to the output at indexed location, without performing any bounds checking.
-    pub unsafe fn get_unchecked( &self, index: usize ) -> &T {
+    pub unsafe fn get_unchecked_data( &self, index: usize ) -> &T {
         &self.chunks.get_unchecked( index / chunk_len::<T>() )[ index % chunk_len::<T>() ]
     }
 
     /// Returns a mutable reference to the output at indexed location, without performing any bounds checking.
-    pub unsafe fn get_unchecked_mut( &mut self, index: usize ) -> &mut T {
+    pub unsafe fn get_unchecked_data_mut( &mut self, index: usize ) -> &mut T {
         &mut self.chunks.get_unchecked_mut( index / chunk_len::<T>() )[ index % chunk_len::<T>() ]
     }
 
@@ -890,8 +892,8 @@ mod tests {
             unsafe fn set_index( &mut self, index: usize )  { self.0 = index; }
         }
 
-        let pool: Box<Pool<(usize,usize)>> = Pool::new();
-        let addr: *mut Pool<_> = Box::into_raw( pool );
+        let pool: Pin<Box<Pool<(usize,usize)>>> = Pool::new();
+        let addr: *mut Pool<_> = Box::into_raw( Pin::into_inner( pool ));
         let mut pool: Box<Pool<(usize,usize)>> = unsafe{ Box::from_raw( addr )};
         let mut ptrs = Vec::new();
         let ( a, b ) = ( 256_usize, 1024 );
